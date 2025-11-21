@@ -31,42 +31,59 @@ uv run uvicorn app.main:app --reload
 
 The server will start at `http://127.0.0.1:8000`.
 
+### Web Interface
+
+Open your browser and navigate to [http://127.0.0.1:8000](http://127.0.0.1:8000).
+You will see a simple interface to upload a PDF file, track the conversion progress, and download the resulting ePub.
+
 ### API Documentation
 
 FastAPI provides automatic interactive documentation. Once the server is running, visit:
 - Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - ReDoc: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
-### Converting a PDF
+### API Usage
 
-You can use the `/convert` endpoint to convert a PDF file.
+You can also use the API programmatically. The application exposes an asynchronous job-based API:
 
-**Example using `curl`:**
+1. **Upload PDF**: `POST /api/upload`
+   - Returns a `job_id`.
+2. **Check Status**: `GET /api/status/{job_id}`
+   - Returns status (`queued`, `processing`, `completed`, `failed`) and progress percentage.
+3. **Download Result**: `GET /api/download/{job_id}`
+   - Downloads the generated ePub when status is `completed`.
 
-```bash
-curl -X POST "http://127.0.0.1:8000/convert" \
-  -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@/path/to/your/book.pdf;type=application/pdf" \
-  --output converted_book.epub
-```
-
-**Example using Python (requests):**
+**Example using Python:**
 
 ```python
 import requests
+import time
 
-url = "http://127.0.0.1:8000/convert"
-# Note: Ensure the file is opened in binary mode
-# and optionally specify the mime type if needed
+base_url = "http://127.0.0.1:8000"
 files = {'file': ('book.pdf', open('book.pdf', 'rb'), 'application/pdf')}
-response = requests.post(url, files=files)
 
-if response.status_code == 200:
-    with open('book.epub', 'wb') as f:
-        f.write(response.content)
-else:
-    print("Error:", response.text)
+# 1. Start Job
+response = requests.post(f"{base_url}/api/upload", files=files)
+job_id = response.json()['job_id']
+print(f"Job started: {job_id}")
+
+# 2. Poll Status
+while True:
+    status_res = requests.get(f"{base_url}/api/status/{job_id}").json()
+    print(f"Status: {status_res['status']} ({status_res['progress']}%)")
+
+    if status_res['status'] == 'completed':
+        break
+    if status_res['status'] == 'failed':
+        print("Error:", status_res.get('error'))
+        exit(1)
+    time.sleep(1)
+
+# 3. Download
+download_res = requests.get(f"{base_url}/api/download/{job_id}")
+with open('book.epub', 'wb') as f:
+    f.write(download_res.content)
+print("Download complete.")
 ```
 
 ## Development
