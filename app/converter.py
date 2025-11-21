@@ -8,17 +8,23 @@ import os
 import html
 
 class PDFToEpubConverter:
-    def __init__(self, pdf_bytes):
+    def __init__(self, pdf_bytes, progress_callback=None):
         self.doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         self.book = epub.EpubBook()
         self.pages_content = []  # List of list of text blocks
+        self.progress_callback = progress_callback
 
     def extract_text(self):
         """
         Extracts text blocks from the PDF.
         Aggregates spans into lines and paragraphs to preserve sentence structure.
         """
-        for page in self.doc:
+        total_pages = len(self.doc)
+        for i, page in enumerate(self.doc):
+            if self.progress_callback:
+                # Phase 1: Extraction is roughly 50% of the work
+                self.progress_callback(int((i / total_pages) * 50))
+
             blocks = page.get_text("dict")["blocks"]
             page_blocks = []
             for b in blocks:
@@ -186,8 +192,19 @@ class PDFToEpubConverter:
         Orchestrates the conversion and returns the path to the generated epub.
         """
         self.extract_text()
+
+        if self.progress_callback:
+            self.progress_callback(60)
+
         self.detect_and_remove_artifacts()
+
+        if self.progress_callback:
+            self.progress_callback(70)
+
         chapters_data = self.detect_chapters()
+
+        if self.progress_callback:
+            self.progress_callback(80)
 
         # Setup Epub
         self.book.set_identifier('id123456')
@@ -232,4 +249,8 @@ class PDFToEpubConverter:
         os.close(fd)
 
         epub.write_epub(path, self.book)
+
+        if self.progress_callback:
+            self.progress_callback(100)
+
         return path

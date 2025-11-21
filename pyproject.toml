@@ -8,6 +8,7 @@ dependencies = [
     "beautifulsoup4>=4.14.2",
     "ebooklib>=0.20",
     "fastapi>=0.121.3",
+    "playwright>=1.56.0",
     "pymupdf>=1.26.6",
     "python-multipart>=0.0.20",
     "requests>=2.32.5",
