@@ -34,7 +34,7 @@ The server will start at `http://127.0.0.1:8000`.
 ### Web Interface
 
 Open your browser and navigate to [http://127.0.0.1:8000](http://127.0.0.1:8000).
-You will see a simple interface to upload a PDF file, track the conversion progress, and download the resulting ePub.
+You will see a user-friendly interface where you can upload a PDF file, view the real-time conversion progress, and download the resulting ePub file.
 
 ### API Documentation
 
