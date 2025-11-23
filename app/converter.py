@@ -63,7 +63,6 @@ class PDFToEpubConverter:
                                 "text": full_text,
                                 "size": avg_size,
                                 "bbox": block_bbox,
-                                "font": "mixed" # Simplified
                             })
             self.pages_content.append(page_blocks)
 
@@ -84,24 +83,33 @@ class PDFToEpubConverter:
         header_threshold = height * 0.1
         footer_threshold = height * 0.9
 
+        def normalize_artifact_text(t):
+            # Remove digits and whitespace to catch "2 HEADER" vs "4 HEADER"
+            return re.sub(r'[\d\s]+', '', t).lower()
+
         # 1. Identify potential repeating artifacts
         for page_blocks in self.pages_content:
             for block in page_blocks:
                 y0 = block['bbox'][1]
                 text = block['text']
+                norm_text = normalize_artifact_text(text)
+
+                if not norm_text: # Skip empty after normalization
+                    continue
 
                 if y0 < header_threshold:
-                    top_candidates[text] += 1
+                    top_candidates[norm_text] += 1
                 elif y0 > footer_threshold:
-                    bottom_candidates[text] += 1
+                    bottom_candidates[norm_text] += 1
 
-        # Threshold: if text appears on more than 40% of pages (min 2 pages)
-        threshold_count = max(2, len(self.pages_content) * 0.4)
+        # Threshold: if text appears on more than 30% of pages (min 2 pages)
+        threshold_count = max(2, len(self.pages_content) * 0.3)
 
         # Debug print
-        # print(f"Top candidates: {top_candidates}")
-        # print(f"Bottom candidates: {bottom_candidates}")
-        # print(f"Threshold: {threshold_count}")
+        with open("debug_artifacts.txt", "w") as f:
+            f.write(f"Top candidates: {top_candidates.most_common(20)}\n")
+            f.write(f"Bottom candidates: {bottom_candidates.most_common(20)}\n")
+            f.write(f"Threshold: {threshold_count}\n")
 
         artifacts = set()
         for text, count in top_candidates.items():
@@ -112,6 +120,11 @@ class PDFToEpubConverter:
                 artifacts.add(text)
 
         # 2. Filter content
+        # Strict zone: Remove anything very close to edges regardless of frequency
+        # Headers are at ~34, Body at ~70. Safe cut: 50.
+        strict_top_limit = 50 
+        strict_bottom_limit = height - 50
+
         cleaned_pages = []
         for page_blocks in self.pages_content:
             cleaned_page = []
@@ -119,11 +132,30 @@ class PDFToEpubConverter:
                 text = block['text']
                 y0 = block['bbox'][1]
 
-                # Check for page numbers (digit only) near edges
-                # Even if not repeating, a single digit at top/bottom is likely a page number
+                # 1. Strict Zone Check
+                if y0 < strict_top_limit or y0 > strict_bottom_limit:
+                    continue
+
+                # 2. Page Number Check (for things slightly outside strict zone)
                 is_page_number = re.match(r'^\d+$', text) and (y0 < header_threshold or y0 > footer_threshold)
 
-                if text not in artifacts and not is_page_number:
+                # 3. Known Artifacts Check
+                is_known_artifact = False
+                artifact_patterns = [
+                    r"This content downloaded from",
+                    r"All use subject to https://about.jstor.org",
+                    r"about.jstor.org/terms"
+                ]
+                for pattern in artifact_patterns:
+                    if re.search(pattern, text, re.IGNORECASE):
+                        is_known_artifact = True
+                        break
+                
+                # 4. Repeating Artifact Check
+                norm_text = normalize_artifact_text(text)
+                is_repeating_artifact = norm_text in artifacts
+
+                if not is_repeating_artifact and not is_page_number and not is_known_artifact:
                     cleaned_page.append(block)
             cleaned_pages.append(cleaned_page)
 

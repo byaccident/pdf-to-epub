@@ -1,0 +1,3 @@
+Top candidates: [('societyandeconomy', 100), ('powerintheeconomy', 21), ('references', 19), ('trustintheeconomy', 17), ('theeconomyandsocialinstitutions', 17), ('theinterplaybetweenindividualactionandsocialinstitutions', 17), ('theimpactofmentalconstructsoneconomicaction', 15), ('introduction:problemsofexplanationineconomicsociology', 12), ('index', 8), ('notesfrompages–', 6), ('viiiacknowledgments', 1)]
+Bottom candidates: [('thiscontentdownloadedfrom...onsun,jul::utc', 254), ('allusesubjecttohttps://about.jstor.org/terms', 254)]
+Threshold: 76.2
