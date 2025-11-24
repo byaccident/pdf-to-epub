@@ -13,28 +13,19 @@ def analyze_pdf(path):
         doc = fitz.open(path)
         print(f"Pages: {len(doc)}")
         
-        # Check pages up to 100
-        for i in range(100):
+        # Check first 10 pages for Front Matter analysis
+        for i in range(10):
             page = doc[i]
-            if i == 98: # Page 99 (Book Page 88)
-                print(f"--- Page {i+1} (Book Page 88?) ---")
-                blocks = page.get_text("dict")["blocks"]
-                for b in blocks:
-                    if b['type'] == 0:
-                         full_block_text = ""
-                         for l in b["lines"]:
-                             for s in l["spans"]:
-                                 full_block_text += s["text"] + " "
-                         print(f"BLOCK: {full_block_text[:100]}...")
-                         print(f"       ...{full_block_text[-100:]}")
-            
-            if i == 99: # Page 100
-                print(f"--- Page {i+1} ---")
-                blocks = page.get_text("dict")["blocks"]
-                if blocks:
-                    b = blocks[0]
-                    if b['type'] == 0:
-                         print(f"START BLOCK: {b['lines'][0]['spans'][0]['text'][:100]}")
+            print(f"\n--- Page {i+1} Content ---")
+            blocks = page.get_text("dict")["blocks"]
+            for b in blocks:
+                if b['type'] == 0:
+                     full_block_text = ""
+                     for l in b["lines"]:
+                         for s in l["spans"]:
+                             full_block_text += s["text"] + " "
+                     safe_text = full_block_text.encode('ascii', 'ignore').decode('ascii')
+                     print(f"BLOCK (y={b['bbox'][1]:.1f}): {safe_text[:100]}...")
 
     except Exception as e:
         print(f"Error reading PDF: {e}")
@@ -44,20 +35,44 @@ def analyze_epub(path):
     try:
         book = epub.read_epub(path)
         
+        # List all items to debug cover
+        print("EPUB Items:")
+        for item in book.get_items():
+            print(f"  ID: {item.get_id()} Type: {item.get_type()} Name: {item.file_name}")
+
+        # Check for cover
+        try:
+            # ebooklib usually sets cover with id 'cover-img' or similar, let's check manifest
+            cover_items = [i for i in book.get_items() if i.get_type() == ebooklib.ITEM_IMAGE]
+            if cover_items:
+                print(f"Cover Image Candidates: {len(cover_items)}")
+                for ci in cover_items:
+                    print(f"  Image: {ci.file_name} Size: {len(ci.content)}")
+            else:
+                print("No images found in EPUB.")
+        except Exception as e:
+            print(f"Error checking cover: {e}")
+        
         items = list(book.get_items())
         html_items = [i for i in items if i.get_type() == ebooklib.ITEM_DOCUMENT]
 
-        print("Scanning EPUB for 'Chung found'...")
-        for item in html_items:
-            content = item.get_content().decode('utf-8')
+        print("Scanning Front Matter (Chap 0) for structure...")
+        if html_items:
+            content = html_items[0].get_content().decode('utf-8')
+            # print(f"Chap 0 Content Preview (first 500 chars):\n{content[:500]}")
+            
+            # Check for newlines in text (which indicate preserved structure)
             soup = BeautifulSoup(content, 'html.parser')
             text = soup.get_text()
-            
-            if "As I described" in text:
-                idx = text.find("As I described")
-                snippet = text[max(0, idx-200):idx+200]
-                snippet = snippet.encode('ascii', 'ignore').decode('ascii')
-                print(f"  Found 'As I described' in {item.file_name}: ...{snippet}...")
+            if "\n" in text:
+                 print("  Confirmed: Newlines preserved in Front Matter.")
+                 # Print a sample of preserved lines
+                 lines = text.split('\n')
+                 print("  Sample Lines:")
+                 for l in lines[:5]:
+                     print(f"    {l.strip()}")
+            else:
+                 print("  Warning: No newlines found in Front Matter text.")
 
     except Exception as e:
         print(f"Error reading EPUB: {e}")

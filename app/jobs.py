@@ -9,7 +9,7 @@ class JobManager:
         self.jobs: Dict[str, Dict] = {}
         self.lock = threading.Lock()
 
-    def create_job(self) -> str:
+    def create_job(self, filename: str = "document.pdf") -> str:
         job_id = str(uuid.uuid4())
         with self.lock:
             self.jobs[job_id] = {
@@ -17,7 +17,8 @@ class JobManager:
                 "progress": 0,
                 "result_path": None,
                 "error": None,
-                "created_at": time.time()
+                "created_at": time.time(),
+                "filename": filename
             }
         return job_id
 

@@ -35,7 +35,7 @@ async def upload_pdf(background_tasks: BackgroundTasks, file: UploadFile = File(
         raise HTTPException(status_code=400, detail=f"Invalid file type: {file.content_type}. Only PDF allowed.")
 
     content = await file.read()
-    job_id = job_manager.create_job()
+    job_id = job_manager.create_job(filename=file.filename)
 
     # Run in background
     background_tasks.add_task(process_pdf_task, job_id, content)
@@ -65,9 +65,14 @@ def download_result(job_id: str, background_tasks: BackgroundTasks):
     # Let's schedule removal to keep disk clean, assuming single download.
     # background_tasks.add_task(remove_file, path)
 
+    # Determine filename
+    original_name = job.get("filename", "converted.pdf")
+    base_name = os.path.splitext(original_name)[0]
+    download_name = f"{base_name}.epub"
+
     return FileResponse(
         path=path,
-        filename="converted.epub",
+        filename=download_name,
         media_type="application/epub+zip"
     )
 

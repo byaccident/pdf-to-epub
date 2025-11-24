@@ -14,6 +14,52 @@ class PDFToEpubConverter:
         self.pages_content = []  # List of list of text blocks
         self.progress_callback = progress_callback
 
+    def extract_cover_image(self):
+        """
+        Checks the first page for a large image to use as a cover.
+        Returns True if a cover was found and set.
+        """
+        try:
+            page = self.doc[0]
+            images = page.get_images()
+            
+            if not images:
+                return False
+
+            # Find the largest image on the page
+            best_image = None
+            max_area = 0
+            
+            for img in images:
+                xref = img[0]
+                # Get image info
+                base_image = self.doc.extract_image(xref)
+                if not base_image:
+                    continue
+                    
+                width = base_image["width"]
+                height = base_image["height"]
+                area = width * height
+                
+                if area > max_area:
+                    max_area = area
+                    best_image = base_image
+
+            # Heuristic: Image must be reasonably large to be a cover
+            # e.g., at least 300x400
+            if best_image and best_image["width"] > 300 and best_image["height"] > 400:
+                image_data = best_image["image"]
+                image_ext = best_image["ext"]
+                
+                # Set cover in ebooklib
+                self.book.set_cover(f"cover.{image_ext}", image_data)
+                return True
+                
+        except Exception as e:
+            print(f"Error extracting cover: {e}")
+        
+        return False
+
     def extract_text(self):
         """
         Extracts text blocks from the PDF.
@@ -53,7 +99,12 @@ class PDFToEpubConverter:
                              block_text_parts.append(line_str)
 
                     if block_text_parts:
-                        full_text = " ".join(block_text_parts).strip() # Join lines with space
+                        # Front Matter Heuristic: First 12 pages often contain TOC, Copyright, etc.
+                        # Preserve line breaks for these pages to keep structure.
+                        if i < 12:
+                             full_text = "\n".join(block_text_parts).strip()
+                        else:
+                             full_text = " ".join(block_text_parts).strip() # Join lines with space
 
                         # Calculate weighted average font size for the block
                         avg_size = block_size_accum / block_char_count if block_char_count > 0 else 12
@@ -233,6 +284,9 @@ class PDFToEpubConverter:
         """
         Orchestrates the conversion and returns the path to the generated epub.
         """
+        # Try to extract cover image
+        has_cover = self.extract_cover_image()
+
         self.extract_text()
 
         if self.progress_callback:
