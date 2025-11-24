@@ -207,7 +207,17 @@ class PDFToEpubConverter:
                         chapters.append(current_chapter)
                     current_chapter = {"title": text, "content": []}
                 else:
-                    current_chapter["content"].append(text)
+                    # Check if we should merge with the previous paragraph
+                    # If previous paragraph doesn't end with sentence punctuation, likely a split sentence
+                    if current_chapter["content"]:
+                        prev_para = current_chapter["content"][-1].strip()
+                        # Check for sentence-ending punctuation (., ?, !, or closing quotes/parens)
+                        if not re.search(r'[.?!”’"\'\)\]]$', prev_para):
+                             current_chapter["content"][-1] = current_chapter["content"][-1] + " " + text
+                        else:
+                             current_chapter["content"].append(text)
+                    else:
+                        current_chapter["content"].append(text)
 
         # Append the last chapter
         if current_chapter["content"] or current_chapter["title"] != "Introduction":

@@ -12,20 +12,30 @@ def analyze_pdf(path):
     try:
         doc = fitz.open(path)
         print(f"Pages: {len(doc)}")
-        print(f"Metadata: {doc.metadata}")
         
-        # Check pages 10-30
-        for i in range(10, min(30, len(doc))):
+        # Check pages up to 100
+        for i in range(100):
             page = doc[i]
-            blocks = page.get_text("dict")["blocks"]
-            for b in blocks:
-                if b['type'] == 0: # text
-                    y0 = b['bbox'][1]
-                    if y0 < 100: # Only look at top of page
-                        print(f"  Page {i+1} Top Content: '{b['lines'][0]['spans'][0]['text'][:30]}...' Y0: {y0:.2f}")
+            if i == 98: # Page 99 (Book Page 88)
+                print(f"--- Page {i+1} (Book Page 88?) ---")
+                blocks = page.get_text("dict")["blocks"]
+                for b in blocks:
+                    if b['type'] == 0:
+                         full_block_text = ""
+                         for l in b["lines"]:
+                             for s in l["spans"]:
+                                 full_block_text += s["text"] + " "
+                         print(f"BLOCK: {full_block_text[:100]}...")
+                         print(f"       ...{full_block_text[-100:]}")
             
-            # print(f"Sample text: {preview}...")
-            
+            if i == 99: # Page 100
+                print(f"--- Page {i+1} ---")
+                blocks = page.get_text("dict")["blocks"]
+                if blocks:
+                    b = blocks[0]
+                    if b['type'] == 0:
+                         print(f"START BLOCK: {b['lines'][0]['spans'][0]['text'][:100]}")
+
     except Exception as e:
         print(f"Error reading PDF: {e}")
 
@@ -33,41 +43,22 @@ def analyze_epub(path):
     print(f"\n--- Analyzing EPUB: {os.path.basename(path)} ---")
     try:
         book = epub.read_epub(path)
-        print(f"Title: {book.get_metadata('DC', 'title')}")
         
         items = list(book.get_items())
-        print(f"Total items: {len(items)}")
-        
         html_items = [i for i in items if i.get_type() == ebooklib.ITEM_DOCUMENT]
-        print(f"HTML Documents: {len(html_items)}")
-        
-        # Check all HTML items for the artifact
-        print("Scanning EPUB for artifacts...")
-        found_artifact = False
+
+        print("Scanning EPUB for 'Chung found'...")
         for item in html_items:
             content = item.get_content().decode('utf-8')
             soup = BeautifulSoup(content, 'html.parser')
             text = soup.get_text()
-            if "Problems of Explanation" in text:
-                snippet = text[text.find('Problems of Explanation')-20:text.find('Problems of Explanation')+50]
-                snippet = snippet.encode('ascii', 'ignore').decode('ascii')
-                print(f"  Found artifact in {item.file_name}: ...{snippet}...")
-                found_artifact = True
-        
-        if not found_artifact:
-            print("  No 'Problems of Explanation' artifacts found in EPUB.")
-
-        if not found_artifact:
-            print("  No 'Problems of Explanation' artifacts found in EPUB (except potentially in TOC).")
-
-        print("\n--- Chapter Previews ---")
-        for i, item in enumerate(html_items):
-            content = item.get_content().decode('utf-8')
-            soup = BeautifulSoup(content, 'html.parser')
-            preview = soup.get_text()[:200].replace('\n', ' ')
-            preview = preview.encode('ascii', 'ignore').decode('ascii')
-            print(f"Chapter {i} ({item.file_name}): {preview}...")
             
+            if "As I described" in text:
+                idx = text.find("As I described")
+                snippet = text[max(0, idx-200):idx+200]
+                snippet = snippet.encode('ascii', 'ignore').decode('ascii')
+                print(f"  Found 'As I described' in {item.file_name}: ...{snippet}...")
+
     except Exception as e:
         print(f"Error reading EPUB: {e}")
 
